@@ -1,0 +1,79 @@
+﻿@model Application.Models.Payment
+
+@{
+    ViewBag.FormTitle = "Make a payment";
+    Layout = "~/Views/Shared/_MinimalLayout.cshtml";
+}
+
+<div class="panels">
+    <div class="grid grid--gutters">
+        <div class="container container--page" style="max-width: 800px;">
+            <div class="grid__section">
+                <div class="grid__row">
+                    <div class="grid__column grid__column--12">
+                        <div class="panel">
+                            <form method="POST" id="paymentForm" action="@Model.HppUrl">
+                                <fieldset>
+                                    <legend>Proceed to payment</legend>
+
+                                    @if (!Model.ManuallyStopRecording)
+                                    {
+                                        <p>You're being redirected to our secure online payment system.</p>
+                                        <p>If you are not automatically redirected within 10 seconds please select 'Begin your payment' below</p>
+                                    }
+                                    else
+                                    {
+                                        <div style="text-align: center;">
+                                            <p><strong style="font-size: 8rem; color:#aa0000">!</strong></p>
+                                            <p><strong style="font-size: 2rem; color: #aa0000">Please manually stop recording the call</strong></p>
+                                            <p>Once the call is no longer recording you can press 'Begin your payment'</p>
+                                        </div>
+                                    }
+
+                                    <!-- Billing details -->
+                                    <input type="hidden" name="currencyCode" value="@Model.CurrencyCode">
+                                    <input type="hidden" name="merchantAccount" value="@Model.MerchantAccount">
+                                    <input type="hidden" name="merchantReference" value="@Model.MerchantReference">
+                                    <input type="hidden" name="paymentAmount" value="@Model.PaymentAmount">
+                                    <input type="hidden" name="recurringContract" value="">
+                                    <input type="hidden" name="sessionValidity" value="@Model.SessionValidity">
+                                    <input type="hidden" name="shipBeforeDate" value="@Model.ShipBeforeDate">
+                                    <input type="hidden" name="shopperEmail" value="">
+                                    <input type="hidden" name="shopperLocale" value="@Model.ShopperLocale">
+                                    <input type="hidden" name="shopperReference" value="">
+                                    <input type="hidden" name="skinCode" value="@Model.SkinCode">
+                                    <input type="hidden" name="resURL" value="@Model.ResUrl">
+                                    <input type="hidden" name="merchantSig" value="@Model.MerchantSig">
+
+                                    @if (Model.BillingAddress != null)
+                                    {
+                                        <!-- Address details -->
+                                        <input type="hidden" name="billingAddress.street" value="@Model.BillingAddress.Street">
+                                        <input type="hidden" name="billingAddress.houseNumberOrName" value="@Model.BillingAddress.HouseNumberOrName">
+                                        <input type="hidden" name="billingAddress.city" value="@Model.BillingAddress.City">
+                                        <input type="hidden" name="billingAddress.postalCode" value="@Model.BillingAddress.PostCode">
+                                        <input type="hidden" name="billingAddress.stateOrProvince" value="@Model.BillingAddress.County">
+                                        <input type="hidden" name="billingAddress.country" value="@Model.BillingAddress.Country">
+                                        <input type="hidden" name="billingAddressType" value="@Model.BillingAddress.Type">
+                                        <input type="hidden" name="billingAddressSig" value="@Model.BillingAddress.MerchantSig">
+                                    }
+
+                                    <div style="text-align: center; margin-top: 2rem;">
+                                        <input type="submit" class="button button--main " value="Begin your payment">
+                                    </div>
+                                </fieldset>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.ManuallyStopRecording)
+{
+    <script type="text/javascript">
+        document.getElementById('paymentForm').submit();
+    </script>
+}
