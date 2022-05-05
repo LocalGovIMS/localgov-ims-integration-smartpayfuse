@@ -14,7 +14,7 @@ namespace Application.UnitTests
                 Transaction_Id = "123456789",
                 Req_Currency = "GB",
                 Decision = "ERROR",
-                Signed_Field_Names = "",
+                Signed_Field_Names = "transaction_id",
                 Req_Reference_Number = "",
                 Message = "",
                 Signature = "",
