@@ -3,15 +3,21 @@ using Domain.Exceptions;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Keys = Application.Commands.PaymentResponseParameterKeys;
+using System;
+using System.Text;
+using System.Security.Cryptography;
+using Application.Models;
 
 namespace Application.Commands
 {
     public class PaymentResponseCommand : IRequest<ProcessPaymentResponseModel>
     {
         public Dictionary<string, string> Paramaters { get; set; }
+        public PaymentResponse paymentResponse { get; set; }
     }
 
     public class PaymentResponseCommandHandler : IRequestHandler<PaymentResponseCommand, ProcessPaymentResponseModel>
@@ -34,7 +40,7 @@ namespace Application.Commands
         {
             ValidateRequest(request);
 
-            BuildProcessPaymentModel(request.Paramaters);
+            BuildProcessPaymentModel(request.Paramaters, request.paymentResponse);
 
             await ProcessPayment();
 
@@ -44,7 +50,7 @@ namespace Application.Commands
         private void ValidateRequest(PaymentResponseCommand request)
         {
             var originalMerchantSignature = ExtractMerchantSignature(request.Paramaters);
-            var calculatedMerchantSignature = CalculateMerchantSignature(request.Paramaters);
+            var calculatedMerchantSignature = CalculateMerchantSignature(request.Paramaters, request.paymentResponse);
 
             if (!calculatedMerchantSignature.Equals(originalMerchantSignature))
             {
@@ -61,32 +67,52 @@ namespace Application.Commands
             return originalMerchantSignature;
         }
 
-        private string CalculateMerchantSignature(Dictionary<string, string> paramaters)
+        private string CalculateMerchantSignature(Dictionary<string, string> paramaters, PaymentResponse paymentResponse)
         {
-            string signingString = SigningUtilities.BuildSigningString(paramaters);
-            string calculatedMerchantSignature = HmacUtilities.CalculateHmac(_configuration.GetValue<string>("SmartPay:HmacKey"), signingString);
+            var signingString = string.Join(",", paymentResponse.Signed_Field_Names.Split(',')
+                .Select(signingField => signingField + "=" + paramaters[signingField]).ToList());
+                 var encoding = new UTF8Encoding();
+                 var keyByte = encoding.GetBytes(_configuration.GetValue<string>("SmartPayFuse:SecretKey"));
 
+                  var hmacsha256 = new HMACSHA256(keyByte);
+                  var messageBytes = encoding.GetBytes(signingString);
+                  var calculatedMerchantSignature = Convert.ToBase64String(hmacsha256.ComputeHash(messageBytes));
             return calculatedMerchantSignature;
+
         }
 
-        private void BuildProcessPaymentModel(Dictionary<string, string> paramaters)
+        private void BuildProcessPaymentModel(Dictionary<string, string> paramaters, PaymentResponse paymentResponse)
         {
+
             switch (paramaters[Keys.AuthorisationResult])
             {
                 case AuthorisationResult.Authorised:
                     _processPaymentModel = new ProcessPaymentModel()
                     {
-                        AuthResult = paramaters.GetValueOrDefault(Keys.AuthorisationResult),
+                        AuthResult = LocalGovIMSResults.Authorised,
                         PspReference = paramaters.GetValueOrDefault(Keys.PspReference),
                         MerchantReference = paramaters.GetValueOrDefault(Keys.MerchantReference),
                         PaymentMethod = paramaters.GetValueOrDefault(Keys.PaymentMethod)
                     };
                     break;
-
+                case AuthorisationResult.Declined:
+                    _processPaymentModel = new ProcessPaymentModel()
+                    {
+                        AuthResult = LocalGovIMSResults.Refused,
+                        MerchantReference = paramaters.GetValueOrDefault(Keys.MerchantReference)
+                    };
+                    break;
+                case AuthorisationResult.Cancelled:
+                    _processPaymentModel = new ProcessPaymentModel()
+                    {
+                        AuthResult = LocalGovIMSResults.Cancelled,
+                        MerchantReference = paramaters.GetValueOrDefault(Keys.MerchantReference)
+                    };
+                    break;
                 default:
                     _processPaymentModel = new ProcessPaymentModel()
                     {
-                        AuthResult = paramaters.GetValueOrDefault(Keys.AuthorisationResult),
+                        AuthResult = LocalGovIMSResults.Error,
                         MerchantReference = paramaters.GetValueOrDefault(Keys.MerchantReference)
                     };
                     break;

@@ -108,19 +108,6 @@ namespace Infrastructure.Clients.LocalGovImsPaymentApi
             return null;
         }
 
-        public async Task<HttpStatusCode> Notify(NotificationModel model)
-        {
-            using var client = new HttpClient();
 
-            client.BaseAddress = new Uri(_apiUrl);
-            client.DefaultRequestHeaders.Clear();
-            client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
-
-            HttpContent content = new StringContent(JsonConvert.SerializeObject(model), Encoding.UTF8, "application/json");
-
-            HttpResponseMessage result = await client.PostAsync($"api/Notification", content);
-
-            return result.StatusCode;
-        }
     }
 }

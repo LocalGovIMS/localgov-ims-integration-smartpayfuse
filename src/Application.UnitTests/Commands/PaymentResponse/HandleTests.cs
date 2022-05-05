@@ -6,6 +6,7 @@ using Microsoft.Extensions.Configuration;
 using Moq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System;
 using Xunit;
 using Command = Application.Commands.PaymentResponseCommand;
 using Handler = Application.Commands.PaymentResponseCommandHandler;
@@ -17,6 +18,7 @@ namespace Application.UnitTests.Commands.PaymentResponse
     {
         private readonly Handler _commandHandler;
         private Command _command;
+        private Models.PaymentResponse _paymentResponse;
 
         private readonly Mock<IConfiguration> _mockConfiguration = new Mock<IConfiguration>();
         private readonly Mock<ILocalGovImsPaymentApiClient> _mockLocalGovImsPaymentApiClient = new Mock<ILocalGovImsPaymentApiClient>();
@@ -29,12 +31,14 @@ namespace Application.UnitTests.Commands.PaymentResponse
 
             SetupConfig();
             SetupClient(System.Net.HttpStatusCode.OK);
+            SetUpPaymentResponse();
             SetupCommand(new Dictionary<string, string> {
                 { Keys.AuthorisationResult, AuthorisationResult.Authorised },
                 { Keys.MerchantSignature, "NZL0OxbvIzufD/ejZODSJ3SzcNQKMJ1JhzQaKH9LWtM=" },
                 { Keys.PspReference, "8816281505278071" },
                 { Keys.PaymentMethod, "Card" }
-            });
+            } , _paymentResponse
+            );
         }
 
         private void SetupConfig()
@@ -45,15 +49,20 @@ namespace Application.UnitTests.Commands.PaymentResponse
             _mockConfiguration.Setup(x => x.GetSection("SmartPay:HmacKey")).Returns(hmacKeyConfigSection.Object);
         }
 
+        private void SetUpPaymentResponse()
+        {
+            _paymentResponse = TestData.GetPaymentResponseModel();
+        }
+
         private void SetupClient(System.Net.HttpStatusCode statusCode)
         {
             _mockLocalGovImsPaymentApiClient.Setup(x => x.ProcessPayment(It.IsAny<string>(), It.IsAny<ProcessPaymentModel>()))
                 .ReturnsAsync(new ProcessPaymentResponseModel());
         }
 
-        private void SetupCommand(Dictionary<string, string> parameters)
+        private void SetupCommand(Dictionary<string, string> parameters, Application.Models.PaymentResponse paymentResponse)
         {
-            _command = new Command() { Paramaters = parameters };
+            _command = new Command() { Paramaters = parameters, paymentResponse = paymentResponse };
         }
 
         [Fact]
@@ -65,7 +74,7 @@ namespace Application.UnitTests.Commands.PaymentResponse
                 { Keys.MerchantSignature, "1NZL0OxbvIzufD/ejZODSJ3SzcNQKMJ1JhzQaKH9LWtM=" },
                 { Keys.PspReference, "8816281505278071" },
                 { Keys.PaymentMethod, "Card" }
-            });
+            }, _paymentResponse);
 
             // Act
             async Task task() => await _commandHandler.Handle(_command, new System.Threading.CancellationToken());
@@ -86,7 +95,7 @@ namespace Application.UnitTests.Commands.PaymentResponse
                 { Keys.MerchantSignature, merchantSignature },
                 { Keys.PspReference, "8816281505278071" },
                 { Keys.PaymentMethod, "Card" }
-            });
+            }, _paymentResponse);
 
             // Act
             var result = await _commandHandler.Handle(_command, new System.Threading.CancellationToken());

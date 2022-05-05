@@ -2,6 +2,8 @@
 using Application.Models;
 using Microsoft.Extensions.Configuration;
 using System;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace Application.Builders
 {
@@ -20,64 +22,64 @@ namespace Application.Builders
         {
             CreatePayment(args);
 
-            SetMopCode(args);
-
-            SetSessionValidity(args);
-
-            CreateMerchantSignature(args);
+            CreateMerchantSignature();
 
             return _payment;
         }
 
         private void CreatePayment(PaymentBuilderArgs args)
         {
-            _payment = new Payment
-            {
-                PaymentAmount = ((int)(args.Amount * 100)).ToString(),
-                MerchantReference = args.Reference,
-                HppUrl = _configuration.GetValue<string>("SmartPay:Url"),
-                HmacKey = _configuration.GetValue<string>("SmartPay:HmacKey"),
-                ShipBeforeDate = DateTime.Today.ToString("yyyy-MM-dd"),
-                SkinCode = _configuration.GetValue<string>("SmartPay:SkinCode"),
-                SessionValidity = DateTime.Now.AddMinutes(10).ToString("yyyy-MM-ddTHH:mm:ssK"),
-                ResUrl = _configuration.GetValue<string>("PaymentPortalUrl") + "/Payment/PaymentResponse",
-                CurrencyCode = "GBP",
-                ShopperLocale = "en_GB",
-                BillingAddress = new BillingAddress()
-                {
-                    HouseNumberOrName = args.Transaction.PayeePremiseNumber,
-                    Street = args.Transaction.PayeeStreet,
-                    City = args.Transaction.PayeeTown,
-                    PostCode = args.Transaction.PayeePostCode,
-                    County = args.Transaction.PayeeCounty
-                }
-            };
+            _payment = new Payment();
+            _payment.AccessKey = _configuration.GetValue<string>("SmartPayFuse:AccessKey");
+            _payment.ProfileId = _configuration.GetValue<string>("SmartPayFuse:ProfileId");
+            _payment.Amount = args.Amount;
+            _payment.ReferenceNumber = args.Reference;
+            _payment.SmartPayFusePaymentEndpoint = _configuration.GetValue<string>("SmartPayFuse:HostedCheckoutEndpoint");
+            _payment.SecretKey = _configuration.GetValue<string>("SmartPayFuse:SecretKey");
+            _payment.OverrideBackofficePostUrl = _configuration.GetValue<string>("PaymentPortalUrl") + "/Payment/PaymentResponse";
+            _payment.OverrideCustomCancelPage = _configuration.GetValue<string>("PaymentPortalUrl") + "/Payment/PaymentResponse";
+            _payment.OverrideCustomReceiptPage = _configuration.GetValue<string>("PaymentPortalUrl") + "/Payment/PaymentResponse";
+            _payment.Currency = "GBP";
+            _payment.Locale = "en";
+            _payment.BillToAddressLine1 = args.Transaction.PayeePremiseNumber + " " + args.Transaction.PayeeStreet;
+            _payment.BillToAddressCity = args.Transaction.PayeeTown;
+            _payment.BillToAddressPostalCode = args.Transaction.PayeePostCode;
+            _payment.BillToAddressCountry = "GB";
+
         }
 
-        private void SetMopCode(PaymentBuilderArgs args)
+        private void CreateMerchantSignature()
         {
-            if (args.Transaction?.MopCode != null)
-            {
-                _payment.PaymentMopCode = args.Transaction.MopCode;
+            var signingString = "";
+
+            _payment.SignedDateTime = DateTime.UtcNow;
+            signingString += "access_key=" + _payment.AccessKey + ",";
+            signingString += "profile_id=" + _payment.ProfileId + ",";
+            signingString += "transaction_uuid=" + _payment.TransactionUuid + ",";
+            signingString += "signed_field_names=" +
+                             "access_key,profile_id,transaction_uuid,signed_field_names,unsigned_field_names,signed_date_time,locale,transaction_type,reference_number,amount,currency,override_backoffice_post_url,override_custom_cancel_page,override_custom_receipt_page" +
+                             ",";
+            signingString += "unsigned_field_names=" +
+                             "bill_to_address_line1,bill_to_address_city,bill_to_address_state,bill_to_address_postal_code,bill_to_address_country,bill_to_email" +
+                             ",";
+            signingString += "signed_date_time=" + _payment.SignedDateTime.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'") + ",";
+            signingString += "locale=" + _payment.Locale + ",";
+            signingString += "transaction_type=" + _payment.TransactionType + ",";
+            signingString += "reference_number=" + _payment.ReferenceNumber + ",";
+            signingString += "amount=" + _payment.Amount + ",";
+            signingString += "currency=" + _payment.Currency + ",";
+            signingString += "override_backoffice_post_url=" + _payment.OverrideBackofficePostUrl + ",";
+            signingString += "override_custom_cancel_page=" + _payment.OverrideCustomCancelPage + ",";
+            signingString += "override_custom_receipt_page=" + _payment.OverrideCustomReceiptPage + "";
+            var encoding = new UTF8Encoding();
+            var keyByte = encoding.GetBytes(_payment.SecretKey);
+
+            var hmacsha256 = new HMACSHA256(keyByte);
+            var messageBytes = encoding.GetBytes(signingString);
+            var signature = Convert.ToBase64String(hmacsha256.ComputeHash(messageBytes));
+
+            _payment.Signature = signature;
             }
-        }
-
-        private void SetSessionValidity(PaymentBuilderArgs args)
-        {
-            if (args.Transaction?.ExpiryDate != null)
-            {
-                _payment.SessionValidity = ((DateTime)args.Transaction.ExpiryDate).ToString("yyyy-MM-ddTHH:mm:ssK");
-            }
-        }
-
-        private void CreateMerchantSignature(PaymentBuilderArgs args)
-        {
-            _payment.CreateMerchantSignature(
-                args.CardSelfServiceMopCode,
-                _configuration.GetValue<string>("SmartPay:MerchantAccount"),
-                _configuration.GetValue<string>("SmartPay:MerchantAccountCNP"),
-                _configuration.GetValue<string>("SmartPay:HmacKey"));
-        }
     }
 
     public class PaymentBuilderArgs
