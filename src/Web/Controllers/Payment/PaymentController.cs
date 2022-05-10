@@ -7,6 +7,7 @@ using System;
 using System.Diagnostics;
 using System.Linq;
 using System.Threading.Tasks;
+using Application.Models;
 using Web.Models;
 
 namespace Web.Controllers
@@ -45,12 +46,12 @@ namespace Web.Controllers
             }
         }
 
-        [HttpGet("PaymentResponse")]
-        public async Task<IActionResult> PaymentResponse()
+        [Route("PaymentResponse")]
+        public async Task<IActionResult> PaymentResponse(PaymentResponse model)
         {
             try
             {
-                var processPaymentResponse = await Mediator.Send(new PaymentResponseCommand() { Paramaters = HttpContext.Request.QueryString.ToDictionary() });
+                var processPaymentResponse = await Mediator.Send(new PaymentResponseCommand() { Paramaters = Request.Form.Keys.ToDictionary(k => k, k => Request.Form[k].ToString()), paymentResponse = model });
 
                 if (!processPaymentResponse.Success)
                 {

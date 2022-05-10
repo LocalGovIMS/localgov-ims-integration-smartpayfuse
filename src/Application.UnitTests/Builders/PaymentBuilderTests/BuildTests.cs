@@ -12,11 +12,10 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
     {
         private Mock<IConfiguration> _mockConfiguration = new Mock<IConfiguration>();
 
-        private const string SmartPayUrl = "SmartPayUrl";
-        private const string HmacKey = "FC81CC7410D19B75B6513FF413BE2E2762CE63D25BA2DFBA63A3183F796530FC";
-        private const string SmartPayMerchantAccount = "SmartPayMerchantAccount";
-        private const string SmartPayMerchantAccountCnp = "SmartPayMerchantAccountCNP";
-        private const string SmartPaySkinCode = "SmartPaySkinCode";
+        private const string AccessKey = "1e2cf8edc97939e383eebb09198ff577";
+        private const string ProfileId = "9FF12BEC-2057-46AC-B935-E42D1A85F4B8";
+        private const string SmartPayFusePaymentEndpoint = "SmartPayFusePaymentEndpoint";
+        private const string SecretKey = "ddc4fc675f404a108feb82ae475cbc982da072350b7c42c6b647ae41d208a9d0ce71d501023345de981abd6a7ab1e9092f81b0c2b44845fabcc63ad9f85b4e1105be4e5446334446883e044ecd1b7c285d2a3647ccec477e9989fe0704f5920181a0b6f004f4438eba3142486e90a62b8708904253ca437e906c96de20dd0230";
         private const string PaymentPortalUrl = "PaymentPortalUrl";
 
         private IBuilder<PaymentBuilderArgs, Payment> _builder;
@@ -31,30 +30,33 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
 
         private void SetupConfiguration()
         {
-            var smartPayUrlConfigSection = new Mock<IConfigurationSection>();
-            smartPayUrlConfigSection.Setup(a => a.Value).Returns(SmartPayUrl);
+            var smartPayAccessKeyConfigSection = new Mock<IConfigurationSection>();
+            smartPayAccessKeyConfigSection.Setup(a => a.Value).Returns(AccessKey);
 
-            var smartPayHmacKeyConfigSection = new Mock<IConfigurationSection>();
-            smartPayHmacKeyConfigSection.Setup(a => a.Value).Returns(HmacKey);
+            var smartPayProfileIdConfigSection = new Mock<IConfigurationSection>();
+            smartPayProfileIdConfigSection.Setup(a => a.Value).Returns(ProfileId);
 
-            var smartPayMerchantAccountConfigSection = new Mock<IConfigurationSection>();
-            smartPayMerchantAccountConfigSection.Setup(a => a.Value).Returns(SmartPayMerchantAccount);
+            var smartPayEndPointConfigSection = new Mock<IConfigurationSection>();
+            smartPayEndPointConfigSection.Setup(a => a.Value).Returns(SmartPayFusePaymentEndpoint);
 
-            var smartPayMerchantAccountCNPConfigSection = new Mock<IConfigurationSection>();
-            smartPayMerchantAccountCNPConfigSection.Setup(a => a.Value).Returns(SmartPayMerchantAccountCnp);
+            var smartPaySecretKeyConfigSection = new Mock<IConfigurationSection>();
+            smartPaySecretKeyConfigSection.Setup(a => a.Value).Returns(SecretKey);
 
-            var smartPaySkinCodeConfigSection = new Mock<IConfigurationSection>();
-            smartPaySkinCodeConfigSection.Setup(a => a.Value).Returns(SmartPaySkinCode);
+            var smartPayPaymentPortalUrlConfigSection = new Mock<IConfigurationSection>();
+            smartPayPaymentPortalUrlConfigSection.Setup(a => a.Value).Returns(PaymentPortalUrl);
 
-            var paymentPortalUrlConfigSection = new Mock<IConfigurationSection>();
-            paymentPortalUrlConfigSection.Setup(a => a.Value).Returns(PaymentPortalUrl);
+            var smartPayOverrideCustomCancelPageConfigSection = new Mock<IConfigurationSection>();
+            smartPayOverrideCustomCancelPageConfigSection.Setup(a => a.Value).Returns(PaymentPortalUrl);
 
-            _mockConfiguration.Setup(x => x.GetSection("SmartPay:Url")).Returns(smartPayUrlConfigSection.Object);
-            _mockConfiguration.Setup(x => x.GetSection("SmartPay:HmacKey")).Returns(smartPayHmacKeyConfigSection.Object);
-            _mockConfiguration.Setup(x => x.GetSection("SmartPay:MerchantAccount")).Returns(smartPayMerchantAccountConfigSection.Object);
-            _mockConfiguration.Setup(x => x.GetSection("SmartPay:MerchantAccountCNP")).Returns(smartPayMerchantAccountCNPConfigSection.Object);
-            _mockConfiguration.Setup(x => x.GetSection("SmartPay:SkinCode")).Returns(smartPaySkinCodeConfigSection.Object);
-            _mockConfiguration.Setup(x => x.GetSection("PaymentPortalUrl")).Returns(paymentPortalUrlConfigSection.Object);
+            var smartPayOverrideCustomReceiptPageConfigSection = new Mock<IConfigurationSection>();
+            smartPayOverrideCustomReceiptPageConfigSection.Setup(a => a.Value).Returns(PaymentPortalUrl);
+
+            _mockConfiguration.Setup(x => x.GetSection("SmartPayFuse:AccessKey")).Returns(smartPayAccessKeyConfigSection.Object);
+            _mockConfiguration.Setup(x => x.GetSection("SmartPayFuse:ProfileId")).Returns(smartPayProfileIdConfigSection.Object);
+            _mockConfiguration.Setup(x => x.GetSection("SmartPayFuse:HostedCheckoutEndpoint")).Returns(smartPayEndPointConfigSection.Object);
+            _mockConfiguration.Setup(x => x.GetSection("SmartPayFuse:SecretKey")).Returns(smartPaySecretKeyConfigSection.Object);
+            _mockConfiguration.Setup(x => x.GetSection("PaymentPortalUrl")).Returns(smartPayPaymentPortalUrlConfigSection.Object);
+
         }
 
         private void SetupBuilder()
@@ -73,8 +75,8 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             };
         }
 
-        [Fact]
-        public void Build_sets_PaymentAmount()
+         [Fact]
+        public void Build_sets_AccessKey()
         {
             // Arrange
             Arrange();
@@ -83,11 +85,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.PaymentAmount.Should().Be(((int)(_args.Amount * 100)).ToString());
+            result.AccessKey.Should().Be(AccessKey);
         }
 
         [Fact]
-        public void Build_sets_MerchantReference()
+        public void Build_sets_ProfileId()
         {
             // Arrange
             Arrange();
@@ -96,11 +98,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.MerchantReference.Should().Be("TestReference");
+            result.ProfileId.Should().Be(ProfileId);
         }
 
         [Fact]
-        public void Build_sets_HppUrl()
+        public void Build_sets_Amount()
         {
             // Arrange
             Arrange();
@@ -109,11 +111,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.HppUrl.Should().Be(SmartPayUrl);
+            result.Amount.Should().Be((decimal)(_args.Amount));
         }
 
         [Fact]
-        public void Build_sets_HmacKey()
+        public void Build_sets_ReferenceNumber()
         {
             // Arrange
             Arrange();
@@ -122,11 +124,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.HmacKey.Should().Be(HmacKey);
+            result.ReferenceNumber.Should().Be("TestReference");
         }
 
         [Fact]
-        public void Build_sets_ShipBeforeDate()
+        public void Build_sets_SmartPayFusePaymentEndpoint()
         {
             // Arrange
             Arrange();
@@ -135,11 +137,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.ShipBeforeDate.Should().Be(DateTime.Today.ToString("yyyy-MM-dd"));
+            result.ProfileId.Should().Be(ProfileId);
         }
 
         [Fact]
-        public void Build_sets_SkinCode()
+        public void Build_sets_SecretKeyy()
         {
             // Arrange
             Arrange();
@@ -148,11 +150,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.SkinCode.Should().Be(SmartPaySkinCode);
+            result.SecretKey.Should().Be(SecretKey);
         }
 
         [Fact]
-        public void Build_sets_ResUrl()
+        public void Build_sets_OverrideBackofficePostUrl()
         {
             // Arrange
             Arrange();
@@ -161,11 +163,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.ResUrl.Should().Be($"{PaymentPortalUrl}/Payment/PaymentResponse");
+            result.OverrideBackofficePostUrl.Should().Be(PaymentPortalUrl + "/Payment/PaymentResponse");
         }
 
         [Fact]
-        public void Build_sets_CurrencyCode()
+        public void Build_sets_OverrideCustomCancelPage()
         {
             // Arrange
             Arrange();
@@ -174,11 +176,11 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.CurrencyCode.Should().Be("GBP");
+            result.OverrideCustomCancelPage.Should().Be(PaymentPortalUrl + "/Payment/PaymentResponse");
         }
 
         [Fact]
-        public void Build_sets_ShopperLocale()
+        public void Build_sets_OverrideCustomReceiptPage()
         {
             // Arrange
             Arrange();
@@ -187,40 +189,33 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
             var result = _builder.Build(_args);
 
             // Assert
-            result.ShopperLocale.Should().Be("en_GB");
+            result.OverrideCustomReceiptPage.Should().Be(PaymentPortalUrl + "/Payment/PaymentResponse");
         }
 
-        [Theory]
-        [InlineData("", "")]
-        [InlineData("MC", "MC")]
-        public void Build_sets_MopCode(string transactionMopCode, string expectedMopCode)
+        [Fact]
+        public void Build_sets_Currency()
         {
             // Arrange
             Arrange();
-            _args.Transaction.MopCode = transactionMopCode;
 
             // Act 
             var result = _builder.Build(_args);
 
             // Assert
-            result.PaymentMopCode.Should().Be(expectedMopCode);
+            result.Currency.Should().Be("GBP");
         }
 
-        [Theory]
-        [InlineData(null)]
-        [InlineData("2010-01-01T00:00:00")]
-        public void Build_sets_SessionValidity(string expiryDate)
+        [Fact]
+        public void Build_sets_Locale()
         {
             // Arrange
             Arrange();
-            _ = DateTime.TryParse(expiryDate, out var expiryDateToTry);
-            _args.Transaction.ExpiryDate = expiryDateToTry;
 
             // Act 
             var result = _builder.Build(_args);
 
             // Assert
-            result.SessionValidity.Should().Be(expiryDateToTry.ToString("yyyy-MM-ddTHH:mm:ssK"));
+            result.Locale.Should().Be("en");
         }
     }
 }
