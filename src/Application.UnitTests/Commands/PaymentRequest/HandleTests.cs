@@ -36,9 +36,6 @@ namespace Application.UnitTests.Commands.PaymentRequest
 
         private void SetupClient(System.Net.HttpStatusCode statusCode)
         {
-            _mockLocalGovImsPaymentApiClient.Setup(x => x.Notify(It.IsAny<NotificationModel>()))
-                .ReturnsAsync(statusCode);
-
             _mockLocalGovImsPaymentApiClient.Setup(x => x.GetProcessedTransactions(It.IsAny<string>()))
                 .ReturnsAsync((List<ProcessedTransactionModel>)null);
 

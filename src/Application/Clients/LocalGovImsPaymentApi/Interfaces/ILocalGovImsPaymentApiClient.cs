@@ -10,6 +10,5 @@ namespace Application.Clients.LocalGovImsPaymentApi
         Task<List<ProcessedTransactionModel>> GetProcessedTransactions(string reference);
         Task<MethodOfPaymentModel> GetCardSelfServiceMopCode();
         Task<ProcessPaymentResponseModel> ProcessPayment(string reference, ProcessPaymentModel model);
-        Task<HttpStatusCode> Notify(NotificationModel model);
     }
 }

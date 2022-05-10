@@ -1,11 +1,13 @@
 ﻿using Application.Models;
 using MediatR;
 using Microsoft.Extensions.Configuration;
-using SmartPayService;
 using System;
+using System.Linq;
 using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
+using Application.Clients.CybersourceRestApiClient.Interfaces;
+using Application.Clients.LocalGovImsPaymentApi;
 
 namespace Application.Commands
 {
@@ -17,59 +19,41 @@ namespace Application.Commands
     public class RefundRequestCommandHandler : IRequestHandler<RefundRequestCommand, RefundResult>
     {
         private readonly IConfiguration _configuration;
-        private readonly IPaymentPortTypeClient _paymentPortTypeClient;
+        private readonly ICybersourceRestApiClient _cybersourceRestApiClient;
+        private readonly ILocalGovImsPaymentApiClient _localGovImsPaymentApiClient;
 
-        private Amount _amount;
-        private string _merchantAccount;
+        private decimal _amount;
 
         public RefundRequestCommandHandler(
             IConfiguration configuration,
-            IPaymentPortTypeClient paymentPortTypeClient)
+            ICybersourceRestApiClient cybersourceRestApiClient,
+            ILocalGovImsPaymentApiClient localGovImsPaymentApiClient)
         {
-            _paymentPortTypeClient = paymentPortTypeClient;
             _configuration = configuration;
+            _cybersourceRestApiClient = cybersourceRestApiClient;
+            _localGovImsPaymentApiClient = localGovImsPaymentApiClient;
         }
 
         public async Task<RefundResult> Handle(RefundRequestCommand request, CancellationToken cancellationToken)
         {
-            SetSecurityProtocol();
             SetAmount(request.Refund);
-            SetMerchantAccount();
 
             var result = await RequestRefund(request.Refund);
 
-            return result.response == "[refund-received]"
-                ? RefundResult.Successful(result.pspReference, _amount.value)
+            return result 
+                ? RefundResult.Successful(request.Refund.Reference, _amount)
                 : RefundResult.Failure(string.Empty);
-        }
-
-        private static void SetSecurityProtocol()
-        {
-            ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
         }
 
         private void SetAmount(Refund refund)
         {
-            _amount = new Amount()
-            {
-                currency = "GBP",
-                value = Convert.ToInt64(refund.Amount * 100)
-            };
+            _amount = refund.Amount;
         }
 
-        private void SetMerchantAccount()
+        private async Task<bool> RequestRefund(Refund refund)
         {
-            _merchantAccount = _configuration.GetValue<string>("SmartPay:MerchantAccount");
-        }
-
-        private async Task<ModificationResult> RequestRefund(Refund refund)
-        {
-            return await _paymentPortTypeClient.refundAsync(new ModificationRequest()
-            {
-                merchantAccount = _merchantAccount,
-                modificationAmount = _amount,
-                originalReference = refund.Reference,
-            });
+            var transactions = await _localGovImsPaymentApiClient.GetProcessedTransactions(refund.Reference);
+            return await _cybersourceRestApiClient.RefundPayment(refund.Reference, transactions.First().PspReference, refund.Amount);
         }
     }
 }

@@ -5,7 +5,6 @@ using Microsoft.AspNetCore.Hosting;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using SmartPayService;
 using System;
 using System.ServiceModel;
 
@@ -23,28 +22,11 @@ namespace Web
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            AddSmartPayClient(services);
-
             services.AddControllersWithViews();
             services.AddApplication();
             services.AddInfrastructure();
 
             services.AddAutoMapper(AppDomain.CurrentDomain.GetAssemblies());
-        }
-
-        private IServiceCollection AddSmartPayClient(IServiceCollection services)
-        {
-            PaymentPortTypeClient client = new PaymentPortTypeClient(
-                PaymentPortTypeClient.EndpointConfiguration.PaymentHttpPort,
-                Configuration.GetValue<string>("SmartPay:Service:RemoteAddress"));
-
-            ((BasicHttpBinding)client.Endpoint.Binding).Security.Transport.ClientCredentialType = HttpClientCredentialType.Basic;
-            client.ClientCredentials.UserName.UserName = Configuration.GetValue<string>("SmartPay:Service:Username");
-            client.ClientCredentials.UserName.Password = Configuration.GetValue<string>("SmartPay:Service:Password");
-
-            services.AddSingleton<IPaymentPortTypeClient>(x => client);
-
-            return services;
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
