@@ -1,16 +1,19 @@
-﻿using Application.Clients.LocalGovImsPaymentApi;
-using Application.Commands;
+﻿using Application.Commands;
 using Domain.Exceptions;
 using FluentAssertions;
 using Microsoft.Extensions.Configuration;
 using Moq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
-using System;
+using LocalGovImsApiClient.Model;
 using Xunit;
 using Command = Application.Commands.PaymentResponseCommand;
 using Handler = Application.Commands.PaymentResponseCommandHandler;
 using Keys = Application.Commands.PaymentResponseParameterKeys;
+using System.Threading;
+using Application.Data;
+using Application.Entities;
+using Application.Clients.CybersourceRestApiClient.Interfaces;
 
 namespace Application.UnitTests.Commands.PaymentResponse
 {
@@ -22,13 +25,17 @@ namespace Application.UnitTests.Commands.PaymentResponse
         private Models.PaymentResponse _paymentResponse;
 
         private readonly Mock<IConfiguration> _mockConfiguration = new Mock<IConfiguration>();
-        private readonly Mock<ILocalGovImsPaymentApiClient> _mockLocalGovImsPaymentApiClient = new Mock<ILocalGovImsPaymentApiClient>();
+        private readonly Mock<LocalGovImsApiClient.Api.IPendingTransactionsApi> _mockPendingTransactionsApi = new Mock<LocalGovImsApiClient.Api.IPendingTransactionsApi>();
+        private readonly Mock<IAsyncRepository<Payment>> _mockPaymentRepository = new Mock<IAsyncRepository<Payment>>();
+        private readonly Mock<ICybersourceRestApiClient> _mockCybersourceRestApiClient = new Mock<ICybersourceRestApiClient>();
 
         public HandleTests()
         {
             _commandHandler = new Handler(
                 _mockConfiguration.Object,
-                _mockLocalGovImsPaymentApiClient.Object);
+                _mockPendingTransactionsApi.Object,
+                _mockPaymentRepository.Object,
+                _mockCybersourceRestApiClient.Object);
 
             SetupConfig();
             SetupClient(System.Net.HttpStatusCode.OK);
@@ -62,8 +69,8 @@ namespace Application.UnitTests.Commands.PaymentResponse
 
         private void SetupClient(System.Net.HttpStatusCode statusCode)
         {
-            _mockLocalGovImsPaymentApiClient.Setup(x => x.ProcessPayment(It.IsAny<string>(), It.IsAny<ProcessPaymentModel>()))
-                .ReturnsAsync(new ProcessPaymentResponseModel());
+            _mockPendingTransactionsApi.Setup(x => x.PendingTransactionsProcessPaymentAsync(It.IsAny<string>(), It.IsAny<ProcessPaymentModel>(),0, It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new ProcessPaymentResponse());
         }
 
         private void SetupCommand(Dictionary<string, string> parameters, Application.Models.PaymentResponse paymentResponse)
@@ -109,7 +116,7 @@ namespace Application.UnitTests.Commands.PaymentResponse
             var result = await _commandHandler.Handle(_command, new System.Threading.CancellationToken());
 
             // Assert
-            result.Should().BeOfType<ProcessPaymentResponseModel>();
+            result.Should().BeOfType<PaymentResponseCommandResult>();
         }
     }
 }

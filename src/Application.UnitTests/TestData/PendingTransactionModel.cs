@@ -1,5 +1,5 @@
-﻿using Application.Clients.LocalGovImsPaymentApi;
-using System;
+﻿using System;
+using LocalGovImsApiClient.Model;
 
 namespace Application.UnitTests
 {

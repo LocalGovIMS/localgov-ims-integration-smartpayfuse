@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace Application.Models
 {
-    public class Payment
+    public class SmartPayFusePayment
     {
         /// <summary>
         /// Required for authentication with

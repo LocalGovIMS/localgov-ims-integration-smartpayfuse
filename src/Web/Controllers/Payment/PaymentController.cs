@@ -33,7 +33,12 @@ namespace Web.Controllers
         {
             try
             {
-                var paymentDetails = await Mediator.Send(new PaymentRequestCommand() { Reference = reference, Hash = hash });
+                var paymentDetails = await Mediator.Send(
+                    new PaymentRequestCommand()
+                    {
+                        Reference = reference,
+                        Hash = hash
+                    });
 
                 return View(paymentDetails);
             }
@@ -59,7 +64,7 @@ namespace Web.Controllers
                     return View("~/Views/Shared/Error.cshtml");
                 }
 
-                return Redirect(processPaymentResponse.RedirectUrl);
+                return Redirect(processPaymentResponse.NextUrl);
             }
             catch (Exception ex)
             {

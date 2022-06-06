@@ -1,24 +1,25 @@
-﻿using Application.Clients.LocalGovImsPaymentApi;
+﻿using LocalGovImsApiClient.Model;
 using Application.Models;
 using Microsoft.Extensions.Configuration;
 using System;
 using System.Security.Cryptography;
 using System.Text;
+using Application.Entities;
 
 namespace Application.Builders
 {
-    public class PaymentBuilder : IBuilder<PaymentBuilderArgs, Payment>
+    public class PaymentBuilder : IBuilder<PaymentBuilderArgs, SmartPayFusePayment>
     {
         private readonly IConfiguration _configuration;
 
-        private Payment _payment;
+        private SmartPayFusePayment _payment;
 
         public PaymentBuilder(IConfiguration configuration)
         {
             _configuration = configuration;
         }
 
-        public Payment Build(PaymentBuilderArgs args)
+        public SmartPayFusePayment Build(PaymentBuilderArgs args)
         {
             CreatePayment(args);
 
@@ -29,7 +30,7 @@ namespace Application.Builders
 
         private void CreatePayment(PaymentBuilderArgs args)
         {
-            _payment = new Payment();
+            _payment = new SmartPayFusePayment();
             _payment.AccessKey = _configuration.GetValue<string>("SmartPayFuse:AccessKey");
             _payment.ProfileId = _configuration.GetValue<string>("SmartPayFuse:ProfileId");
             _payment.Amount = args.Amount;

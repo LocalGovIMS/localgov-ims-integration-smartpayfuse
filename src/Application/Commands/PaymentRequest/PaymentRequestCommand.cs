@@ -1,5 +1,5 @@
 ﻿using Application.Builders;
-using Application.Clients.LocalGovImsPaymentApi;
+using LocalGovImsApiClient.Model;
 using Application.Cryptography;
 using Application.Models;
 using Domain.Exceptions;
@@ -8,64 +8,129 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using LocalGovImsApiClient.Client;
+using Application.Data;
+using Application.Entities;
+using System;
 
 namespace Application.Commands
 {
-    public class PaymentRequestCommand : IRequest<Payment>
+    public class PaymentRequestCommand : IRequest<SmartPayFusePayment>
     {
         public string Reference { get; set; }
 
         public string Hash { get; set; }
     }
 
-    public class PaymentRequestCommandHandler : IRequestHandler<PaymentRequestCommand, Payment>
+    public class PaymentRequestCommandHandler : IRequestHandler<PaymentRequestCommand, SmartPayFusePayment>
     {
         private readonly ICryptographyService _cryptographyService;
-        private readonly ILocalGovImsPaymentApiClient _localGovImsPaymentApiClient;
-        private readonly IBuilder<PaymentBuilderArgs, Payment> _paymentBuilder;
+        private readonly IBuilder<PaymentBuilderArgs, SmartPayFusePayment> _paymentBuilder;
+        private readonly LocalGovImsApiClient.Api.IPendingTransactionsApi _pendingTransactionsApi;
+        private readonly LocalGovImsApiClient.Api.IProcessedTransactionsApi _processedTransactionsApi;
+        private readonly IAsyncRepository<Payment> _paymentRepository;
 
         private List<PendingTransactionModel> _pendingTransactions;
         private PendingTransactionModel _pendingTransaction;
         private Payment _payment;
+        private SmartPayFusePayment _result;
 
         public PaymentRequestCommandHandler(
             ICryptographyService cryptographyService,
-            ILocalGovImsPaymentApiClient localGovImsPaymentApiClient,
-            IBuilder<PaymentBuilderArgs, Payment> paymentBuilder)
+            IBuilder<PaymentBuilderArgs, SmartPayFusePayment> paymentBuilder,
+            LocalGovImsApiClient.Api.IPendingTransactionsApi pendingTransactionsApi,
+            LocalGovImsApiClient.Api.IProcessedTransactionsApi processedTransactionsApi,
+            IAsyncRepository<Payment> paymentRepository)
         {
             _cryptographyService = cryptographyService;
-            _localGovImsPaymentApiClient = localGovImsPaymentApiClient;
             _paymentBuilder = paymentBuilder;
+            _pendingTransactionsApi = pendingTransactionsApi;
+            _processedTransactionsApi = processedTransactionsApi;
+            _paymentRepository = paymentRepository;
         }
 
-        public async Task<Payment> Handle(PaymentRequestCommand request, CancellationToken cancellationToken)
+        public async Task<SmartPayFusePayment> Handle(PaymentRequestCommand request, CancellationToken cancellationToken)
         {
             await ValidateRequest(request);
 
             GetPendingTransaction();
 
-            await BuildPayment(request);
+            await CreatePayment(request);
 
-            return _payment;
+            BuildPayment(request);
+
+            return _result;
         }
 
         private async Task ValidateRequest(PaymentRequestCommand request)
+        {
+            ValidateRequestValue(request);
+            await CheckThatProcessedTransactionsDoNotExist(request);
+            await CheckThatAPendingTransactionExists(request);
+        }
+
+        private void ValidateRequestValue(PaymentRequestCommand request)
+        {
+            if (request.Reference == null || request.Hash == null || request.Hash != _cryptographyService.GetHash(request.Reference))
+            {
+                throw new PaymentException("The reference provided is not valid");
+            }
+        }
+
+        private async Task CheckThatProcessedTransactionsDoNotExist(PaymentRequestCommand request)
         {
             if (request.Reference == null || request.Hash == null || request.Hash != _cryptographyService.GetHash(request.Reference))
             {
                 throw new PaymentException("The reference provided is not valid");
             }
 
-            var processedTransactions = await _localGovImsPaymentApiClient.GetProcessedTransactions(request.Reference);
-            if (processedTransactions != null && processedTransactions.Any())
+            try
             {
-                throw new PaymentException("The reference provided is no longer a valid pending payment");
-            }
+                var processedTransactions = await _processedTransactionsApi.ProcessedTransactionsSearchAsync(
+                    string.Empty,
+                    null,
+                    string.Empty,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    null,
+                    request.Reference,
+                    string.Empty);
 
-            _pendingTransactions = await _localGovImsPaymentApiClient.GetPendingTransactions(request.Reference);
-            if (_pendingTransactions == null || !_pendingTransactions.Any())
+                if (processedTransactions != null && processedTransactions.Any())
+                {
+                    throw new PaymentException("The reference provided is no longer a valid pending payment");
+                }
+            }
+            catch (ApiException ex)
             {
-                throw new PaymentException("The reference provided is no longer a valid pending payment");
+                if (ex.ErrorCode == 404) return; // If no processed transactions are found the API will return a 404 (Not Found) - so that's fine
+
+                throw;
+            }
+        }
+
+        private async Task CheckThatAPendingTransactionExists(PaymentRequestCommand request)
+        {
+            try
+            {
+                var result = await _pendingTransactionsApi.PendingTransactionsGetAsync(request.Reference);
+
+                if (result == null || !result.Any())
+                {
+                    throw new PaymentException("The reference provided is no longer a valid pending payment");
+                }
+
+                _pendingTransactions = result.ToList();
+            }
+            catch (ApiException ex)
+            {
+                if (ex.ErrorCode == 404)
+                    throw new PaymentException("The reference provided is no longer a valid pending payment");
+
+                throw;
             }
         }
 
@@ -74,13 +139,26 @@ namespace Application.Commands
             _pendingTransaction = _pendingTransactions.FirstOrDefault();
         }
 
-        private async Task BuildPayment(PaymentRequestCommand request)
+
+        private async Task CreatePayment(PaymentRequestCommand request)
         {
-            _payment = _paymentBuilder.Build(new PaymentBuilderArgs()
+            _payment = (await _paymentRepository.Add(new Payment()
+            {
+                Amount = Convert.ToDecimal(_pendingTransactions.Sum(x => x.Amount)),
+                CreatedDate = DateTime.Now,
+                Identifier = Guid.NewGuid(),
+                Reference = request.Reference,
+                FailureUrl = _pendingTransaction.FailUrl
+            })).Data;
+        }
+
+        private void BuildPayment(PaymentRequestCommand request)
+        {
+            _result = _paymentBuilder.Build(new PaymentBuilderArgs()
             {
                 Reference = request.Reference,
                 Amount = _pendingTransactions.Sum(x => x.Amount ?? 0),
-                CardSelfServiceMopCode = (await _localGovImsPaymentApiClient.GetCardSelfServiceMopCode()).Code,
+            //    CardSelfServiceMopCode = (await _methodOfPaymentsApi.MethodOfPaymentsSearchAsync("IsACardSelfServicePayment")),
                 Transaction = _pendingTransaction
             });
         }

@@ -3,10 +3,14 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 using Application.Clients.CybersourceRestApiClient.Interfaces;
+using Application.Commands;
 using CyberSource.Api;
 using CyberSource.Client;
 using CyberSource.Model;
 using Microsoft.Extensions.Configuration;
+using System.Linq;
+using Application.Entities;
+
 
 namespace Infrastructure.Clients
 {
@@ -16,15 +20,16 @@ namespace Infrastructure.Clients
         private readonly string _merchantId;
         private readonly string _restSharedSecretId;
         private readonly string _restSharedSecretKey;
+        private List<Payment> _uncapturedPayments = new();
 
         private readonly Dictionary<string, string> _configurationDictionary = new ();
 
         public CybersourceRestApiClient(IConfiguration configuration)
         {
-            _restApiEndpoint = configuration.GetValue<string>("RestApiEndpoint");
-            _merchantId = configuration.GetValue<string>("MerchantId");
-            _restSharedSecretId = configuration.GetValue<string>("RestSharedSecretId");
-            _restSharedSecretKey = configuration.GetValue<string>("RestSharedSecretKey");
+            _restApiEndpoint = configuration.GetValue<string>("SmartPayFuse:RestApiEndpoint");
+            _merchantId = configuration.GetValue<string>("SmartPayFuse:MerchantId");
+            _restSharedSecretId = configuration.GetValue<string>("SmartPayFuse:RestSharedSecretId");
+            _restSharedSecretKey = configuration.GetValue<string>("SmartPayFuse:RestSharedSecretKey");
             
             SetupConfigDictionary();
         }
@@ -55,7 +60,7 @@ namespace Infrastructure.Clients
 
                 var apiInstance = new RefundApi(clientConfig);
                 var result = await apiInstance.RefundPaymentAsync(requestObj, pspReference);
-                return result.Status == "PENDING"; // todo: check if extra statuses mean success
+                return result.Status == LocalGovIMSResults.Pending; 
             }
             catch (Exception e)
             {
@@ -64,7 +69,7 @@ namespace Infrastructure.Clients
             }
         }
 
-        public async Task SearchPayments(string clientReference, int daysAgo)
+        public async Task<List<Payment>> SearchPayments(string clientReference, int daysAgo)
         {
             var requestObj = new CreateSearchRequest(
                 Save: false,
@@ -81,13 +86,89 @@ namespace Infrastructure.Clients
                 var clientConfig = new Configuration(merchConfigDictObj: _configurationDictionary);
 
                 var apiInstance = new SearchTransactionsApi(clientConfig);
-                var result = await apiInstance.CreateSearchAsync(requestObj);
-                return; // todo: return correct type
+                var searchResult = await apiInstance.CreateSearchAsync(requestObj);
+
+                if (searchResult == null || searchResult.Count == 0)
+                    return _uncapturedPayments;
+
+                var refundResults = searchResult.Embedded.TransactionSummaries.Where(x =>
+                    x.ClientReferenceInformation.ApplicationName == "REST API");
+
+
+                if (searchResult.Embedded.TransactionSummaries.All(x
+                        => string.IsNullOrWhiteSpace(x.ProcessorInformation.ApprovalCode)))
+                    return _uncapturedPayments;
+
+                var activeResults = searchResult.Embedded.TransactionSummaries.Where(x =>
+                    !string.IsNullOrWhiteSpace(x.ProcessorInformation.ApprovalCode));
+
+                foreach (var matchingResult in activeResults)
+                {
+                    _uncapturedPayments.Add(new Payment
+                    {
+                        CreatedDate = DateTime.Now,
+                        Identifier = Guid.NewGuid(),
+                        Reference = matchingResult.Id,
+                        Amount = decimal.Parse(matchingResult.OrderInformation.AmountDetails.TotalAmount),
+                        PaymentId = matchingResult.ClientReferenceInformation.Code,
+                        CapturedDate = Convert.ToDateTime(matchingResult.SubmitTimeUtc),
+                        CardPrefix = matchingResult.PaymentInformation.Card.Prefix,
+                        CardSuffix = matchingResult.PaymentInformation.Card.Suffix
+                    });
+                }
+                return _uncapturedPayments; 
             }
             catch (Exception e)
             {
                 Console.WriteLine("Exception on calling the API : " + e.Message);
-                return;
+                return _uncapturedPayments; // TODO: fix
+            }
+        }
+
+        public async Task<List<Payment>> SearchRefunds(string clientReference, int daysAgo)
+        {
+            var requestObj = new CreateSearchRequest(
+                Save: false,
+                Name: "MRN",
+                Timezone: "Europe/London",
+                Query: BuildSearchQuery(clientReference, daysAgo),
+                Offset: 0,
+                Limit: 1000,
+                Sort: "submitTimeUtc:desc"
+            );
+
+            try
+            {
+                var clientConfig = new Configuration(merchConfigDictObj: _configurationDictionary);
+
+                var apiInstance = new SearchTransactionsApi(clientConfig);
+                var searchResult = await apiInstance.CreateSearchAsync(requestObj);
+
+                if (searchResult == null || searchResult.Count != 1)
+                    return _uncapturedPayments;
+
+                var activeResults = searchResult.Embedded.TransactionSummaries;
+
+                foreach (var matchingResult in activeResults)
+                {
+                    _uncapturedPayments.Add(new Payment
+                    {
+                        CreatedDate = DateTime.Now,
+                        Identifier = Guid.NewGuid(),
+                        Reference = matchingResult.Id,
+                        Amount = decimal.Parse(matchingResult.OrderInformation.AmountDetails.TotalAmount),
+                        PaymentId = matchingResult.ClientReferenceInformation.Code,
+                        CapturedDate = Convert.ToDateTime(matchingResult.SubmitTimeUtc),
+                        CardPrefix = matchingResult.PaymentInformation.Card.Prefix,
+                        CardSuffix = matchingResult.PaymentInformation.Card.Suffix
+                    });
+                }
+                return _uncapturedPayments;
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine("Exception on calling the API : " + e.Message);
+                return _uncapturedPayments; // TODO: fix
             }
         }
 

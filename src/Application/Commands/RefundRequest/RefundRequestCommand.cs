@@ -1,13 +1,12 @@
 ﻿using Application.Models;
 using MediatR;
 using Microsoft.Extensions.Configuration;
-using System;
-using System.Linq;
-using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Clients.CybersourceRestApiClient.Interfaces;
-using Application.Clients.LocalGovImsPaymentApi;
+using Application.Data;
+using Application.Entities;
+using System;
 
 namespace Application.Commands
 {
@@ -20,22 +19,25 @@ namespace Application.Commands
     {
         private readonly IConfiguration _configuration;
         private readonly ICybersourceRestApiClient _cybersourceRestApiClient;
-        private readonly ILocalGovImsPaymentApiClient _localGovImsPaymentApiClient;
+        private readonly IAsyncRepository<Payment> _paymentRepository;
 
         private decimal _amount;
+        private Payment _payment;
 
         public RefundRequestCommandHandler(
             IConfiguration configuration,
             ICybersourceRestApiClient cybersourceRestApiClient,
-            ILocalGovImsPaymentApiClient localGovImsPaymentApiClient)
+            IAsyncRepository<Payment> paymentRepository)
         {
             _configuration = configuration;
             _cybersourceRestApiClient = cybersourceRestApiClient;
-            _localGovImsPaymentApiClient = localGovImsPaymentApiClient;
+            _paymentRepository = paymentRepository;
         }
 
         public async Task<RefundResult> Handle(RefundRequestCommand request, CancellationToken cancellationToken)
         {
+            await CreateIntegrationTransactionAsync(request);
+
             SetAmount(request.Refund);
 
             var result = await RequestRefund(request.Refund);
@@ -45,6 +47,18 @@ namespace Application.Commands
                 : RefundResult.Failure(string.Empty);
         }
 
+        private async Task CreateIntegrationTransactionAsync(RefundRequestCommand request)
+        {
+            _payment = (await _paymentRepository.Add(new Payment()
+            {
+                Amount = request.Refund.Amount,
+                CreatedDate = DateTime.Now,
+                Identifier = Guid.NewGuid(),
+                Reference = request.Refund.Reference,
+                PaymentId = "Refund"
+            })).Data;
+        }
+
         private void SetAmount(Refund refund)
         {
             _amount = refund.Amount;
@@ -52,8 +66,7 @@ namespace Application.Commands
 
         private async Task<bool> RequestRefund(Refund refund)
         {
-            var transactions = await _localGovImsPaymentApiClient.GetProcessedTransactions(refund.Reference);
-            return await _cybersourceRestApiClient.RefundPayment(refund.Reference, transactions.First().PspReference, refund.Amount);
+            return await _cybersourceRestApiClient.RefundPayment(refund.Reference, refund.Reference, refund.Amount);
         }
     }
 }

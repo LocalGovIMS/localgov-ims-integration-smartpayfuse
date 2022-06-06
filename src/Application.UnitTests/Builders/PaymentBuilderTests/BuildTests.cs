@@ -18,7 +18,7 @@ namespace Application.UnitTests.Builders.PaymentBuilderTests
         private const string SecretKey = "ddc4fc675f404a108feb82ae475cbc982da072350b7c42c6b647ae41d208a9d0ce71d501023345de981abd6a7ab1e9092f81b0c2b44845fabcc63ad9f85b4e1105be4e5446334446883e044ecd1b7c285d2a3647ccec477e9989fe0704f5920181a0b6f004f4438eba3142486e90a62b8708904253ca437e906c96de20dd0230";
         private const string PaymentPortalUrl = "PaymentPortalUrl";
 
-        private IBuilder<PaymentBuilderArgs, Payment> _builder;
+        private IBuilder<PaymentBuilderArgs, SmartPayFusePayment> _builder;
         private PaymentBuilderArgs _args;
 
         private void Arrange()
