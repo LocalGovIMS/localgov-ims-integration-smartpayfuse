@@ -91,10 +91,6 @@ namespace Infrastructure.Clients
                 if (searchResult == null || searchResult.Count == 0)
                     return _uncapturedPayments;
 
-                var refundResults = searchResult.Embedded.TransactionSummaries.Where(x =>
-                    x.ClientReferenceInformation.ApplicationName == "REST API");
-
-
                 if (searchResult.Embedded.TransactionSummaries.All(x
                         => string.IsNullOrWhiteSpace(x.ProcessorInformation.ApprovalCode)))
                     return _uncapturedPayments;
