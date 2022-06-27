@@ -39,6 +39,11 @@ namespace Application.Commands
 
             var result = await RequestRefund(request.Refund);
 
+            if (!result)
+            {
+                await SetIntegrationTransactionAsFailed();
+            }
+
             return result 
                 ? RefundResult.Successful(request.Refund.Reference, _amount)
                 : RefundResult.Failure(string.Empty);
@@ -54,6 +59,12 @@ namespace Application.Commands
                 Reference = request.Refund.ImsReference,
                 RefundReference = request.Refund.Reference
             })).Data;
+        }
+        private async Task SetIntegrationTransactionAsFailed()
+        {
+            _payment.Status = AuthorisationResult.Failed;
+            _payment.Finished = true;
+            _payment = (await _paymentRepository.Update(_payment)).Data;
         }
 
         private void SetAmount(Refund refund)

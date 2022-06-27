@@ -121,6 +121,9 @@ namespace Infrastructure.Clients
                 if (searchResult == null || searchResult.Count != 1)
                     return _uncapturedPayments;
 
+                if (searchResult.Embedded.TransactionSummaries.All(x => x.ApplicationInformation.RFlag != "SOK"))
+                    return _uncapturedPayments;
+
                 var activeResults = searchResult.Embedded.TransactionSummaries;
 
                 foreach (var matchingResult in activeResults)

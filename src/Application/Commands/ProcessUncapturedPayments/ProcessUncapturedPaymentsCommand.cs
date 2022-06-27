@@ -12,7 +12,6 @@ using Domain.Exceptions;
 using System;
 using LocalGovImsApiClient.Model;
 using Application.Data;
-using Application.Entities;
 using Application.Extensions;
 
 namespace Application.Commands
