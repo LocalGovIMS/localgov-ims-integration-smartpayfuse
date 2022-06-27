@@ -43,9 +43,12 @@ namespace Application.UnitTests.Commands.RefundRequest
         {
 
             _mockCybersourceRestApiClient.Setup(x => x.RefundPayment(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>()))
-                .ReturnsAsync(new bool() );
+                .ReturnsAsync(true);
 
             _mockPaymentRepository.Setup(x => x.Add(It.IsAny<Payment>()))
+                .ReturnsAsync(new OperationResult<Payment>(true) { Data = new Payment() { Identifier = Guid.NewGuid() } });
+
+            _mockPaymentRepository.Setup(x => x.Update(It.IsAny<Payment>()))
                 .ReturnsAsync(new OperationResult<Payment>(true) { Data = new Payment() { Identifier = Guid.NewGuid() } });
 
         }
@@ -67,6 +70,22 @@ namespace Application.UnitTests.Commands.RefundRequest
 
             // Assert
             result.Should().BeOfType<RefundResult>();
+            result.Success.Should().Be(true);
+        }
+
+        [Fact]
+        public async Task Handle_returns_false_IfRefundFailed()
+        {
+            // Arrange
+            _mockCybersourceRestApiClient.Setup(x => x.RefundPayment(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<decimal>()))
+                .ReturnsAsync(false);
+
+            // Act
+            var result = await _commandHandler.Handle(_command, new System.Threading.CancellationToken());
+
+            // Assert
+            result.Should().BeOfType<RefundResult>();
+            result.Success.Should().Be(false);
         }
     }
 }
