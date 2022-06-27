@@ -14,6 +14,9 @@ using System.Threading;
 using Application.Data;
 using Application.Entities;
 using Application.Clients.CybersourceRestApiClient.Interfaces;
+using System.Linq.Expressions;
+using Application.Result;
+using System;
 
 namespace Application.UnitTests.Commands.PaymentResponse
 {
@@ -60,6 +63,21 @@ namespace Application.UnitTests.Commands.PaymentResponse
             _mockConfiguration.Setup(x => x.GetSection("SmartPay:HmacKey")).Returns(hmacKeyConfigSection.Object);
             _mockConfiguration.Setup(x => x.GetSection("SmartPayFuse:SecretKey")).Returns(smartPaySecretKeyConfigSection.Object);
 
+            _mockCybersourceRestApiClient.Setup(x => x.SearchPayments(It.IsAny<string>(), It.IsAny<int>()))
+                .ReturnsAsync(new List<Payment>() {
+                    new Payment()
+                    {
+                        Amount = 0,
+                        Reference = "Test"
+                    }
+                });
+
+            _mockPaymentRepository.Setup(x => x.Get(It.IsAny<Expression<Func<Payment, bool>>>()))
+                .ReturnsAsync(new OperationResult<Payment>(true) { Data = new Payment() { Identifier = Guid.NewGuid(), Reference = "Test" } });
+
+            _mockPaymentRepository.Setup(x => x.Update(It.IsAny<Payment>()))
+                .ReturnsAsync(new OperationResult<Payment>(true) { Data = new Payment() { Identifier = Guid.NewGuid(), PaymentId = "paymentId", Reference = "refernce" } });
+
         }
 
         private void SetUpPaymentResponse()
@@ -70,7 +88,7 @@ namespace Application.UnitTests.Commands.PaymentResponse
         private void SetupClient(System.Net.HttpStatusCode statusCode)
         {
             _mockPendingTransactionsApi.Setup(x => x.PendingTransactionsProcessPaymentAsync(It.IsAny<string>(), It.IsAny<ProcessPaymentModel>(),0, It.IsAny<CancellationToken>()))
-                .ReturnsAsync(new ProcessPaymentResponse());
+                .ReturnsAsync(new ProcessPaymentResponse() { Success = true });
         }
 
         private void SetupCommand(Dictionary<string, string> parameters, Application.Models.PaymentResponse paymentResponse)
@@ -117,6 +135,28 @@ namespace Application.UnitTests.Commands.PaymentResponse
 
             // Assert
             result.Should().BeOfType<PaymentResponseCommandResult>();
+        }
+
+        [Theory]
+        [InlineData(AuthorisationResult.Declined, "kEz1zuPyA9A7IovYcmMR5Hks/kzrCcJJA7pVAVIAWhI=")]
+        //    [InlineData("Another value", "97Y0KDL1+KEe0gTQJzQ/mBQJIj1dTsIubOwItb+Hsx0=")]
+        public async Task Handle_returns_a_DeclinedPaymentResponseModel(string authorisationResult, string merchantSignature)
+        {
+            // Arrange
+            SetupCommand(new Dictionary<string, string> {
+                { Keys.AuthorisationResult, authorisationResult },
+                { Keys.MerchantSignature, merchantSignature },
+                { Keys.PspReference, "8816281505278071" },
+                { Keys.PaymentMethod, "Card" },
+                { Keys.SigningField, "transaction_id"}
+            }, _paymentResponse);
+
+            // Act
+            var result = await _commandHandler.Handle(_command, new System.Threading.CancellationToken());
+
+            // Assert
+            result.Should().BeOfType<PaymentResponseCommandResult>();
+            result.Success.Should().Be(true);
         }
     }
 }

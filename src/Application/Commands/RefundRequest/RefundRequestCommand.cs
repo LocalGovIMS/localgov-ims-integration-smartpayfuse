@@ -17,7 +17,6 @@ namespace Application.Commands
 
     public class RefundRequestCommandHandler : IRequestHandler<RefundRequestCommand, RefundResult>
     {
-        private readonly IConfiguration _configuration;
         private readonly ICybersourceRestApiClient _cybersourceRestApiClient;
         private readonly IAsyncRepository<Payment> _paymentRepository;
 
@@ -25,11 +24,9 @@ namespace Application.Commands
         private Payment _payment;
 
         public RefundRequestCommandHandler(
-            IConfiguration configuration,
             ICybersourceRestApiClient cybersourceRestApiClient,
             IAsyncRepository<Payment> paymentRepository)
         {
-            _configuration = configuration;
             _cybersourceRestApiClient = cybersourceRestApiClient;
             _paymentRepository = paymentRepository;
         }
@@ -54,8 +51,8 @@ namespace Application.Commands
                 Amount = request.Refund.Amount,
                 CreatedDate = DateTime.Now,
                 Identifier = Guid.NewGuid(),
-                Reference = request.Refund.Reference,
-                PaymentId = "Refund"
+                Reference = request.Refund.ImsReference,
+                RefundReference = request.Refund.Reference
             })).Data;
         }
 
@@ -66,7 +63,7 @@ namespace Application.Commands
 
         private async Task<bool> RequestRefund(Refund refund)
         {
-            return await _cybersourceRestApiClient.RefundPayment(refund.Reference, refund.Reference, refund.Amount);
+            return await _cybersourceRestApiClient.RefundPayment(refund.ImsReference, refund.Reference, refund.Amount);
         }
     }
 }

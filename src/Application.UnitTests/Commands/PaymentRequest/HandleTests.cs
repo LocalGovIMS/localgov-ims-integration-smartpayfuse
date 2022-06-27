@@ -13,6 +13,8 @@ using System.Threading.Tasks;
 using Xunit;
 using Command = Application.Commands.PaymentRequestCommand;
 using Handler = Application.Commands.PaymentRequestCommandHandler;
+using Application.Result;
+using System;
 
 namespace Application.UnitTests.Commands.PaymentRequest
 {
@@ -44,22 +46,39 @@ namespace Application.UnitTests.Commands.PaymentRequest
 
         private void SetupClient(System.Net.HttpStatusCode statusCode)
         {
+            _mockProcessedTransactionsApi.Setup(x => x.ProcessedTransactionsSearchAsync(
+              It.IsAny<string>(),
+              It.IsAny<List<string>>(),
+              It.IsAny<string>(),
+              It.IsAny<decimal?>(),
+              It.IsAny<DateTime?>(),
+              It.IsAny<DateTime?>(),
+              It.IsAny<string>(),
+              It.IsAny<List<string>>(),
+              It.IsAny<string>(),
+              It.IsAny<string>(),
+              It.IsAny<string>(),
+              It.IsAny<int>(),
+              It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<ProcessedTransactionModel>)null);
+
             _mockProcessedTransactionsApi.Setup(x => x.ProcessedTransactionsGetAsync(It.IsAny<string>(),0, It.IsAny<CancellationToken>()))
-                .ReturnsAsync((ProcessedTransactionModel)null);
+                    .ReturnsAsync((ProcessedTransactionModel)null);
 
             _mockPendingTransactionsApi.Setup(x => x.PendingTransactionsGetAsync(It.IsAny<string>(),0, It.IsAny<CancellationToken>()))
                 .ReturnsAsync(new List<PendingTransactionModel>() {
                     new PendingTransactionModel()
                     {
-                        Reference = "Test"
+                        Reference = "reference"
                     }
                 });
 
-            //_mockLocalGovImsPaymentApiClient.Setup(x => x.GetCardSelfServiceMopCode())
-            //    .ReturnsAsync(new MethodOfPaymentModel() { Code = "MC" });
+            _mockPaymentRepository.Setup(x => x.Add(It.IsAny<Payment>()))
+                .ReturnsAsync(new OperationResult<Payment>(true) { Data = new Payment() { Identifier = Guid.NewGuid() } });
 
             _mockBuilder.Setup(x => x.Build(It.IsAny<PaymentBuilderArgs>()))
                 .Returns(new SmartPayFusePayment());
+
         }
 
         private void SetupCryptographyService()
@@ -119,10 +138,25 @@ namespace Application.UnitTests.Commands.PaymentRequest
         public async Task Handle_throws_PaymentException_when_processed_transactions_exists_for_the_reference()
         {
             // Arrange
-            _mockProcessedTransactionsApi.Setup(x => x.ProcessedTransactionsGetAsync(It.IsAny<string>(),0, new System.Threading.CancellationToken()))
-                .ReturnsAsync(new ProcessedTransactionModel 
+            _mockProcessedTransactionsApi.Setup(x => x.ProcessedTransactionsSearchAsync(
+                    It.IsAny<string>(),
+                    It.IsAny<List<string>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<decimal?>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<DateTime?>(),
+                    It.IsAny<string>(),
+                    It.IsAny<List<string>>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<string>(),
+                    It.IsAny<int>(),
+                    It.IsAny<CancellationToken>()))
+                .ReturnsAsync(new List<ProcessedTransactionModel>() {
+                    new ProcessedTransactionModel()
                     {
                         Reference = "Test"
+                    }
                 });
 
             // Act

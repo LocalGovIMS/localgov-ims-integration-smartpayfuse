@@ -150,6 +150,7 @@ namespace Application.Commands
         private async Task UpdateIntegrationPaymentStatus()
         {
             _payment.Status = _processPaymentModel.AuthResult;
+            _payment.PaymentId = _processPaymentModel.PspReference;
             _payment.CardPrefix = _processPaymentModel.CardPrefix;
             _payment.CardSuffix = _processPaymentModel.CardSuffix;
             _payment.CapturedDate = DateTime.Now;

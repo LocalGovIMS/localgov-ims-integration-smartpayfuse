@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using System.Threading.Tasks;
 using MediatR;
-using Microsoft.Extensions.Configuration;
 using Application.Clients.CybersourceRestApiClient.Interfaces;
 using System.Threading;
 using Application.Entities;
@@ -12,9 +11,8 @@ using Domain.Exceptions;
 using System;
 using LocalGovImsApiClient.Model;
 using Application.Data;
-using Application.Entities;
 
-namespace Application.Commands.ProcessUncapturedRefunds
+namespace Application.Commands
 {
     public class ProcessUncapturedRefundsCommand : IRequest<ProcessUncapturedRefundsCommandResult>
     {
@@ -30,7 +28,6 @@ namespace Application.Commands.ProcessUncapturedRefunds
     }
     public class ProcessUncapturedRefundsCommandHander : IRequestHandler<ProcessUncapturedRefundsCommand, ProcessUncapturedRefundsCommandResult>
     {
-        private readonly IConfiguration _configuration;
         private readonly ICybersourceRestApiClient _cybersourceRestApiClient;
         private readonly ILogger<ProcessUncapturedRefundsCommandHander> _logger;
         private readonly LocalGovImsApiClient.Api.IPendingTransactionsApi _pendingTransactionsApi;
@@ -47,14 +44,12 @@ namespace Application.Commands.ProcessUncapturedRefunds
 
 
         public ProcessUncapturedRefundsCommandHander(
-            IConfiguration configuration,
             ICybersourceRestApiClient cybersourceRestApiClient,
             ILogger<ProcessUncapturedRefundsCommandHander> logger,
             LocalGovImsApiClient.Api.IPendingTransactionsApi pendingTransactionsApi,
             IAsyncRepository<Payment> paymentRepository
 )
         {
-            _configuration = configuration;
             _cybersourceRestApiClient = cybersourceRestApiClient;
             _logger = logger;
             _pendingTransactionsApi = pendingTransactionsApi;
@@ -75,7 +70,7 @@ namespace Application.Commands.ProcessUncapturedRefunds
 
         private async Task GetRefundTransactions()
         {
-           _uncapturedRefundsPayments = (await _paymentRepository.List(x => x.PaymentId != null && x.Finished != true)).Data;
+           _uncapturedRefundsPayments = (await _paymentRepository.List(x => x.RefundReference != null && x.Finished != true)).Data;
         }
 
   
@@ -84,12 +79,13 @@ namespace Application.Commands.ProcessUncapturedRefunds
             foreach (var uncapturedRefund in _uncapturedRefundsPayments)
             {
                 _uncapturedRefund = uncapturedRefund;
-                _uncapturedCyberSourceRefunds = await _cybersourceRestApiClient.SearchRefunds(uncapturedRefund.PaymentId, 1);
+                _uncapturedCyberSourceRefunds = await _cybersourceRestApiClient.SearchRefunds(uncapturedRefund.Reference, 1);
 
                 if (_uncapturedCyberSourceRefunds != null && _uncapturedCyberSourceRefunds.Any())
                 {
                     _uncapturedRefund.CardPrefix = _uncapturedCyberSourceRefunds.FirstOrDefault().CardPrefix;
                     _uncapturedRefund.CardSuffix = _uncapturedCyberSourceRefunds.FirstOrDefault().CardSuffix;
+                    _uncapturedRefund.PaymentId = _uncapturedCyberSourceRefunds.FirstOrDefault().PaymentId;
                     await ProcessUncapturedRefund();
                 }
             }
@@ -142,7 +138,7 @@ namespace Application.Commands.ProcessUncapturedRefunds
             _processPaymentModel = new ProcessPaymentModel()
             {
                 AuthResult = LocalGovIMSResults.Authorised,
-                PspReference = _uncapturedCyberSourceRefunds.FirstOrDefault().Reference,
+                PspReference = _uncapturedRefund.PaymentId,
                 MerchantReference = _uncapturedRefund.Reference,
                 Fee = 0,
                 CardPrefix = _uncapturedRefund.CardPrefix,

@@ -36,6 +36,8 @@ namespace Application.Entities
         [StringLength(255)]
         public string FailureUrl { get; set; }
 
+        [StringLength(255)]
+        public string RefundReference { get; set; }
         //
         // Summary:
         //     Gets or Sets CardPrefix

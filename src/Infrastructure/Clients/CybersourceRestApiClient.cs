@@ -10,7 +10,7 @@ using CyberSource.Model;
 using Microsoft.Extensions.Configuration;
 using System.Linq;
 using Application.Entities;
-
+using Infrastructure.Extensions;
 
 namespace Infrastructure.Clients
 {
@@ -71,15 +71,9 @@ namespace Infrastructure.Clients
 
         public async Task<List<Payment>> SearchPayments(string clientReference, int daysAgo)
         {
-            var requestObj = new CreateSearchRequest(
-                Save: false,
-                Name: "MRN",
-                Timezone: "Europe/London",
-                Query: BuildSearchQuery(clientReference, daysAgo),
-                Offset: 0,
-                Limit: 1000,
-                Sort: "submitTimeUtc:desc"
-            );
+            List<Payment> _uncapturedPayments = new();
+
+            var requestObj = CybersourceExtensions.CreateNewSearchRequest(clientReference, daysAgo);
 
             try
             {
@@ -100,17 +94,7 @@ namespace Infrastructure.Clients
 
                 foreach (var matchingResult in activeResults)
                 {
-                    _uncapturedPayments.Add(new Payment
-                    {
-                        CreatedDate = DateTime.Now,
-                        Identifier = Guid.NewGuid(),
-                        Reference = matchingResult.Id,
-                        Amount = decimal.Parse(matchingResult.OrderInformation.AmountDetails.TotalAmount),
-                        PaymentId = matchingResult.ClientReferenceInformation.Code,
-                        CapturedDate = Convert.ToDateTime(matchingResult.SubmitTimeUtc),
-                        CardPrefix = matchingResult.PaymentInformation.Card.Prefix,
-                        CardSuffix = matchingResult.PaymentInformation.Card.Suffix
-                    });
+                    _uncapturedPayments.Add(CybersourceExtensions.CreatePaymentRecord(matchingResult));
                 }
                 return _uncapturedPayments; 
             }
@@ -123,15 +107,9 @@ namespace Infrastructure.Clients
 
         public async Task<List<Payment>> SearchRefunds(string clientReference, int daysAgo)
         {
-            var requestObj = new CreateSearchRequest(
-                Save: false,
-                Name: "MRN",
-                Timezone: "Europe/London",
-                Query: BuildSearchQuery(clientReference, daysAgo),
-                Offset: 0,
-                Limit: 1000,
-                Sort: "submitTimeUtc:desc"
-            );
+            List<Payment> _uncapturedPayments = new();
+
+            var requestObj = CybersourceExtensions.CreateNewSearchRequest(clientReference, daysAgo);
 
             try
             {
@@ -147,17 +125,7 @@ namespace Infrastructure.Clients
 
                 foreach (var matchingResult in activeResults)
                 {
-                    _uncapturedPayments.Add(new Payment
-                    {
-                        CreatedDate = DateTime.Now,
-                        Identifier = Guid.NewGuid(),
-                        Reference = matchingResult.Id,
-                        Amount = decimal.Parse(matchingResult.OrderInformation.AmountDetails.TotalAmount),
-                        PaymentId = matchingResult.ClientReferenceInformation.Code,
-                        CapturedDate = Convert.ToDateTime(matchingResult.SubmitTimeUtc),
-                        CardPrefix = matchingResult.PaymentInformation.Card.Prefix,
-                        CardSuffix = matchingResult.PaymentInformation.Card.Suffix
-                    });
+                    _uncapturedPayments.Add(CybersourceExtensions.CreatePaymentRecord(matchingResult));
                 }
                 return _uncapturedPayments;
             }
@@ -166,24 +134,6 @@ namespace Infrastructure.Clients
                 Console.WriteLine("Exception on calling the API : " + e.Message);
                 return _uncapturedPayments; // TODO: fix
             }
-        }
-
-        private static string BuildSearchQuery(string clientReference, int daysAgo)
-        {
-            var query = "";
-            var submitTimeUtcQuery = "[NOW/DAY-" + daysAgo + "DAY" + ((daysAgo > 1) ? "S" : "") + " TO NOW/DAY+1DAY}";
-
-            if (clientReference != "")
-            {
-                query = "clientReferenceInformation.code:" + clientReference +
-                        " AND submitTimeUtc:" + submitTimeUtcQuery;
-            }
-            else
-            {
-                query = "submitTimeUtc:" + submitTimeUtcQuery;
-            }
-
-            return query;
         }
 
         private void SetupConfigDictionary()

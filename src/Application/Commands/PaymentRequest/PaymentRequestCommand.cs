@@ -158,7 +158,6 @@ namespace Application.Commands
             {
                 Reference = request.Reference,
                 Amount = _pendingTransactions.Sum(x => x.Amount ?? 0),
-            //    CardSelfServiceMopCode = (await _methodOfPaymentsApi.MethodOfPaymentsSearchAsync("IsACardSelfServicePayment")),
                 Transaction = _pendingTransaction
             });
         }
