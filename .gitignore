@@ -362,3 +362,4 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+/src/Web/Properties/ServiceDependencies/app-imssmartpayfuseecom-dev-001 - Web Deploy/profile.arm.json
