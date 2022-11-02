@@ -7,7 +7,7 @@ namespace Application.Cryptography
     {
         public string GetHash(string input)
         {
-            MD5 md5 = new MD5CryptoServiceProvider();
+            MD5 md5 = MD5.Create();
 
             md5.ComputeHash(Encoding.ASCII.GetBytes(input));
 

@@ -71,19 +71,24 @@ namespace Application.Commands
 
         private void ValidateRequestValue(PaymentRequestCommand request)
         {
-            if (request.Reference == null || request.Hash == null || request.Hash != _cryptographyService.GetHash(request.Reference))
+            if (string.IsNullOrEmpty(request.Reference))
             {
-                throw new PaymentException("The reference provided is not valid");
+                throw new PaymentException("The reference provided is null or empty");
+            }
+
+            if (string.IsNullOrEmpty(request.Hash))
+            {
+                throw new PaymentException("The hash provided is null or empty");
+            }
+
+            if (request.Hash != _cryptographyService.GetHash(request.Reference))
+            {
+                throw new PaymentException("The hash is invalid");
             }
         }
 
         private async Task CheckThatProcessedTransactionsDoNotExist(PaymentRequestCommand request)
         {
-            if (request.Reference == null || request.Hash == null || request.Hash != _cryptographyService.GetHash(request.Reference))
-            {
-                throw new PaymentException("The reference provided is not valid");
-            }
-
             try
             {
                 var processedTransactions = await _processedTransactionsApi.ProcessedTransactionsSearchAsync(

@@ -1,6 +1,5 @@
 ﻿using Application.Models;
 using MediatR;
-using Microsoft.Extensions.Configuration;
 using System.Threading;
 using System.Threading.Tasks;
 using Application.Clients.CybersourceRestApiClient.Interfaces;

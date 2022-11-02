@@ -113,9 +113,9 @@ namespace Application.Commands
                         PspReference = paramaters.GetValueOrDefault(Keys.PspReference),
                         MerchantReference = paramaters.GetValueOrDefault(Keys.MerchantReference),
                         PaymentMethod = paramaters.GetValueOrDefault(Keys.PaymentMethod),
-                        CardPrefix = paymentCardDetails.FirstOrDefault().CardPrefix,
-                        CardSuffix = paymentCardDetails.FirstOrDefault().CardSuffix,
-                        AmountPaid = paymentCardDetails.FirstOrDefault().Amount
+                        CardPrefix = paymentCardDetails.Count == 0 ? null : paymentCardDetails.FirstOrDefault().CardPrefix,
+                        CardSuffix = paymentCardDetails.Count == 0 ? null : paymentCardDetails.FirstOrDefault().CardSuffix,
+                        AmountPaid = paymentCardDetails.Count == 0 ? 0 : paymentCardDetails.FirstOrDefault().Amount
                     };
                     break;
                 case AuthorisationResult.Declined:

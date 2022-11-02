@@ -26,6 +26,7 @@ namespace Application.UnitTests.Cryptography.MD5CryptographyService
 
             // Assert
             result.Should().NotBeNullOrEmpty(result);
+            result.Should().Be(expectedResult);
         }
 
         [Theory]
@@ -39,6 +40,7 @@ namespace Application.UnitTests.Cryptography.MD5CryptographyService
 
             // Assert
             result.Should().BeAssignableTo<string>();
+            result.Should().Be(expectedResult);
         }
 
         [Theory]

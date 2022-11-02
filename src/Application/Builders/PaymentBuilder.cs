@@ -41,8 +41,8 @@ namespace Application.Builders
             _payment.OverrideCustomReceiptPage = _configuration.GetValue<string>("PaymentPortalUrl") + "/Payment/PaymentResponse";
             _payment.Currency = "GBP";
             _payment.Locale = "en";
-            _payment.BillToAddressLine1 = args.Transaction.PayeePremiseNumber + " " + args.Transaction.PayeeStreet;
-            _payment.BillToAddressCity = args.Transaction.PayeeTown;
+            _payment.BillToAddressLine1 = args.Transaction.PayeeAddressLine1;
+            _payment.BillToAddressCity = args.Transaction.PayeeAddressLine3;
             _payment.BillToAddressPostalCode = args.Transaction.PayeePostCode;
             _payment.BillToAddressCountry = "GB";
 
